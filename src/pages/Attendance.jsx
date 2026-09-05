@@ -26,6 +26,11 @@ import {
   Loader2,
 } from "lucide-react";
 
+
+// ============================================================
+// DATE / TIME
+// ============================================================
+
 function fmtDate(iso) {
   if (!iso) return "";
 
@@ -42,7 +47,8 @@ function fmtDate(iso) {
 function fmtTime(time) {
   if (!time) return "";
 
-  const [hours, minutes] = String(time).split(":");
+  const [hours, minutes] =
+    String(time).split(":");
 
   if (
     hours === undefined ||
@@ -60,14 +66,16 @@ function fmtTime(time) {
     0
   );
 
-  return date.toLocaleTimeString("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-  });
+  return date.toLocaleTimeString(
+    "en-US",
+    {
+      hour: "numeric",
+      minute: "2-digit",
+    }
+  );
 }
 
 function getTimeSlot(session) {
-  // New data model
   if (
     session.startTime &&
     session.endTime
@@ -79,7 +87,6 @@ function getTimeSlot(session) {
     )}`;
   }
 
-  // Old data model
   if (session.timeSlot) {
     return session.timeSlot;
   }
@@ -87,13 +94,11 @@ function getTimeSlot(session) {
   return "Time not set";
 }
 
-/*
- * Resolve the current user's group.
- *
- * profile.groupId may be:
- * 1. the actual Firestore document ID
- * 2. the group name, e.g. "CE14"
- */
+
+// ============================================================
+// RESOLVE GROUP
+// ============================================================
+
 async function resolveGroup(groupId) {
   if (!groupId) {
     throw new Error(
@@ -101,16 +106,15 @@ async function resolveGroup(groupId) {
     );
   }
 
-  // Try groupId as the document ID first.
+  // First: groupId as document ID
   const directRef = doc(
     db,
     "groups",
     groupId
   );
 
-  const directSnap = await getDoc(
-    directRef
-  );
+  const directSnap =
+    await getDoc(directRef);
 
   if (directSnap.exists()) {
     return {
@@ -120,10 +124,14 @@ async function resolveGroup(groupId) {
     };
   }
 
-  // Fall back to searching by group name.
+  // Fallback: groupId is actually group name
   const groupQuery = query(
     collection(db, "groups"),
-    where("name", "==", groupId),
+    where(
+      "name",
+      "==",
+      groupId
+    ),
     limit(1)
   );
 
@@ -142,14 +150,21 @@ async function resolveGroup(groupId) {
   }
 
   throw new Error(
-    `Could not find your group "${groupId}". Check the Group assignment in Admin → Users.`
+    `Could not find your group "${groupId}".`
   );
 }
 
+
+// ============================================================
+// LEADER / ADMIN VIEW
+// ============================================================
+
 function LeaderView({ profile }) {
-  /*
-   * Load ALL lab sessions.
-   */
+
+  // ----------------------------------------------------------
+  // ALL LAB SESSIONS
+  // ----------------------------------------------------------
+
   const {
     data: allSessions,
     loading: sessionsLoading,
@@ -158,18 +173,21 @@ function LeaderView({ profile }) {
     [orderBy("date", "desc")]
   );
 
-  /*
-   * Load groups so we can resolve a group name
-   * such as CE14 to its actual Firestore ID.
-   */
+
+  // ----------------------------------------------------------
+  // GROUPS
+  // ----------------------------------------------------------
+
   const {
     data: groups,
     loading: groupsLoading,
   } = useCollection("groups");
 
-  /*
-   * Resolve the current user's group.
-   */
+
+  // ----------------------------------------------------------
+  // FIND CURRENT GROUP
+  // ----------------------------------------------------------
+
   const currentGroup = useMemo(() => {
     if (!profile?.groupId) {
       return null;
@@ -178,8 +196,10 @@ function LeaderView({ profile }) {
     return (
       groups.find(
         (group) =>
-          group.id === profile.groupId ||
-          group.name === profile.groupId
+          group.id ===
+            profile.groupId ||
+          group.name ===
+            profile.groupId
       ) || null
     );
   }, [
@@ -190,12 +210,11 @@ function LeaderView({ profile }) {
   const currentGroupId =
     currentGroup?.id || null;
 
-  /*
-   * Show every lab assigned to the current user's group.
-   *
-   * Status is NOT used for filtering.
-   * Scheduled and cancelled labs remain visible.
-   */
+
+  // ----------------------------------------------------------
+  // ALL LABS FOR CURRENT GROUP
+  // ----------------------------------------------------------
+
   const sessions = useMemo(() => {
     if (!currentGroupId) {
       return [];
@@ -203,71 +222,37 @@ function LeaderView({ profile }) {
 
     return allSessions.filter(
       (session) => {
-        /*
-         * New model:
-         * groupIds = [DocumentReference, ...]
-         */
+
         if (
           Array.isArray(
             session.groupIds
           )
         ) {
-          const matchesGroup =
-            session.groupIds.some(
-              (groupRef) => {
-                if (groupRef?.id) {
-                  return (
-                    groupRef.id ===
-                    currentGroupId
-                  );
-                }
+          return session.groupIds.some(
+            (groupRef) => {
 
-                if (
-                  typeof groupRef ===
-                  "string"
-                ) {
-                  return (
-                    groupRef ===
-                      currentGroupId ||
-                    groupRef ===
-                      profile?.groupId
-                  );
-                }
-
-                return false;
+              if (groupRef?.id) {
+                return (
+                  groupRef.id ===
+                  currentGroupId
+                );
               }
-            );
 
-          if (matchesGroup) {
-            return true;
-          }
-        }
+              if (
+                typeof groupRef ===
+                "string"
+              ) {
+                return (
+                  groupRef ===
+                    currentGroupId ||
+                  groupRef ===
+                    profile?.groupId
+                );
+              }
 
-        /*
-         * Backwards compatibility:
-         * old lab documents may have groupId.
-         */
-        if (session.groupId) {
-          if (
-            session.groupId?.id ===
-            currentGroupId
-          ) {
-            return true;
-          }
-
-          if (
-            session.groupId ===
-            currentGroupId
-          ) {
-            return true;
-          }
-
-          if (
-            session.groupId ===
-            profile?.groupId
-          ) {
-            return true;
-          }
+              return false;
+            }
+          );
         }
 
         return false;
@@ -279,32 +264,40 @@ function LeaderView({ profile }) {
     profile?.groupId,
   ]);
 
-  /*
-   * Sort by date, then start time.
-   */
-  const sortedSessions = useMemo(() => {
-    return [...sessions].sort(
-      (a, b) => {
-        if (a.date !== b.date) {
-          return a.date.localeCompare(
-            b.date
+
+  // ----------------------------------------------------------
+  // SORT SESSIONS
+  // ----------------------------------------------------------
+
+  const sortedSessions =
+    useMemo(() => {
+      return [...sessions].sort(
+        (a, b) => {
+
+          if (
+            a.date !== b.date
+          ) {
+            return a.date.localeCompare(
+              b.date
+            );
+          }
+
+          return (
+            (a.startTime ||
+              "99:99"
+            ).localeCompare(
+              b.startTime ||
+                "99:99"
+            )
           );
         }
+      );
+    }, [sessions]);
 
-        const aTime =
-          a.startTime ||
-          "99:99";
 
-        const bTime =
-          b.startTime ||
-          "99:99";
-
-        return aTime.localeCompare(
-          bTime
-        );
-      }
-    );
-  }, [sessions]);
+  // ----------------------------------------------------------
+  // STATE
+  // ----------------------------------------------------------
 
   const [
     sessionId,
@@ -341,12 +334,18 @@ function LeaderView({ profile }) {
     setError,
   ] = useState("");
 
+
+  // ----------------------------------------------------------
+  // SELECTED SESSION
+  // ----------------------------------------------------------
+
   const selectedSession =
     useMemo(
       () =>
         sortedSessions.find(
           (session) =>
-            session.id === sessionId
+            session.id ===
+            sessionId
         ),
       [
         sortedSessions,
@@ -358,34 +357,13 @@ function LeaderView({ profile }) {
     selectedSession?.status ===
     "held";
 
-  /*
-   * Clear the selection if the
-   * current session disappears.
-   */
-  useEffect(() => {
-    if (
-      sessionId &&
-      !sortedSessions.some(
-        (session) =>
-          session.id ===
-          sessionId
-      )
-    ) {
-      setSessionId("");
-      setMembers([]);
-      setMarks({});
-      setError("");
-    }
-  }, [
-    sortedSessions,
-    sessionId,
-  ]);
 
-  /*
-   * Load group members and any existing
-   * attendance marks.
-   */
+  // ----------------------------------------------------------
+  // LOAD MEMBERS + EXISTING ATTENDANCE
+  // ----------------------------------------------------------
+
   useEffect(() => {
+
     if (
       !sessionId ||
       !profile?.groupId ||
@@ -393,27 +371,43 @@ function LeaderView({ profile }) {
     ) {
       setMembers([]);
       setMarks({});
-      setError("");
       setLoadingMembers(false);
+      setError("");
       return;
     }
 
     let cancelled = false;
 
     async function loadAttendance() {
+
       setLoadingMembers(true);
-      setSavedAt(null);
       setError("");
+      setSavedAt(null);
       setMembers([]);
       setMarks({});
 
       try {
+
+        // ====================================================
+        // STEP 1
+        // Resolve group
+        // ====================================================
+
         const group =
           await resolveGroup(
             profile.groupId
           );
 
+        
         if (cancelled) return;
+
+
+        // ====================================================
+        // STEP 2
+        // LOAD MEMBERS FROM groups.members
+        //
+        // THIS IS THE IMPORTANT FIX.
+        // ====================================================
 
         const memberRefs =
           Array.isArray(
@@ -422,81 +416,161 @@ function LeaderView({ profile }) {
             ? group.data.members
             : [];
 
+        
+
         const roster = [];
 
         for (
           const memberRef of memberRefs
         ) {
+
           if (cancelled) return;
 
           if (!memberRef?.path) {
             console.warn(
-              "Ignoring invalid member reference:",
+              "[Attendance] Invalid member reference:",
               memberRef
             );
+
             continue;
           }
 
-          const userSnap =
-            await getDoc(memberRef);
+          try {
 
-          if (!userSnap.exists()) {
-            console.warn(
-              "User document does not exist:",
-              memberRef.path
+            const userSnap =
+              await getDoc(
+                memberRef
+              );
+
+            if (
+              userSnap.exists()
+            ) {
+
+              roster.push({
+                uid:
+                  userSnap.id,
+                ...userSnap.data(),
+              });
+
+            } else {
+
+              console.warn(
+                "[Attendance] User does not exist:",
+                memberRef.path
+              );
+
+            }
+
+          } catch (memberError) {
+
+            console.error(
+              "[Attendance] Failed reading:",
+              memberRef.path,
+              memberError
             );
-            continue;
-          }
 
-          roster.push({
-            uid: userSnap.id,
-            ...userSnap.data(),
-          });
+            throw new Error(
+              `Cannot read ${memberRef.path}: ${
+                memberError?.message ||
+                "permission denied"
+              }`
+            );
+          }
         }
+
+        // Sort alphabetically
+        roster.sort(
+          (a, b) =>
+            String(
+              a.name || ""
+            ).localeCompare(
+              String(
+                b.name || ""
+              )
+            )
+        );
+
+        
 
         if (cancelled) return;
 
         setMembers(roster);
 
-        /*
-         * Load existing attendance.
-         */
-        const existingMarks = {};
 
-        await Promise.all(
-          roster.map(
-            async (member) => {
-              const recordRef =
-                doc(
-                  db,
-                  "attendanceRecords",
-                  `${sessionId}_${member.uid}`
-                );
+        // ====================================================
+        // STEP 3
+        // EXISTING ATTENDANCE
+        // ====================================================
 
-              const recordSnap =
-                await getDoc(
-                  recordRef
-                );
+        const attendanceQuery =
+          query(
+            collection(
+              db,
+              "attendanceRecords"
+            ),
+            where(
+              "groupId",
+              "==",
+              group.ref
+            )
+          );
 
-              existingMarks[
-                member.uid
-              ] =
-                recordSnap.exists()
-                  ? recordSnap.data()
-                      .present === true
-                  : false;
-            }
-          )
-        );
+        const attendanceSnapshot =
+          await getDocs(
+            attendanceQuery
+          );
 
         if (cancelled) return;
 
-        setMarks(existingMarks);
+
+        // Default everyone to absent
+        const existingMarks = {};
+
+        roster.forEach(
+          (member) => {
+            existingMarks[
+              member.uid
+            ] = false;
+          }
+        );
+
+
+        // Apply saved marks
+        attendanceSnapshot.forEach(
+          (recordDoc) => {
+
+            const data =
+              recordDoc.data();
+
+            if (
+              data.sessionId ===
+                sessionId &&
+              data.uid
+            ) {
+
+              existingMarks[
+                data.uid
+              ] =
+                data.present ===
+                true;
+            }
+          }
+        );
+
+        
+
+        if (cancelled) return;
+
+        setMarks(
+          existingMarks
+        );
+
       } catch (err) {
+
         if (cancelled) return;
 
         console.error(
-          "Failed to load attendance:",
+          "[Attendance] LOAD FAILED:",
           err
         );
 
@@ -507,9 +581,13 @@ function LeaderView({ profile }) {
           err?.message ||
             "Unable to load attendance."
         );
+
       } finally {
+
         if (!cancelled) {
-          setLoadingMembers(false);
+          setLoadingMembers(
+            false
+          );
         }
       }
     }
@@ -519,14 +597,23 @@ function LeaderView({ profile }) {
     return () => {
       cancelled = true;
     };
+
   }, [
     sessionId,
     profile?.groupId,
     canMarkAttendance,
   ]);
 
+
+  // ----------------------------------------------------------
+  // TOGGLE
+  // ----------------------------------------------------------
+
   const toggle = (uid) => {
-    if (!canMarkAttendance) return;
+
+    if (!canMarkAttendance) {
+      return;
+    }
 
     setMarks((prev) => ({
       ...prev,
@@ -534,36 +621,53 @@ function LeaderView({ profile }) {
     }));
   };
 
+
+  // ----------------------------------------------------------
+  // MARK ALL PRESENT
+  // ----------------------------------------------------------
+
   const markAllPresent = () => {
-    if (!canMarkAttendance) return;
 
     const next = {};
 
-    members.forEach((member) => {
-      next[member.uid] = true;
-    });
+    members.forEach(
+      (member) => {
+        next[member.uid] = true;
+      }
+    );
 
     setMarks(next);
   };
+
+
+  // ----------------------------------------------------------
+  // MARK ALL ABSENT
+  // ----------------------------------------------------------
 
   const markAllAbsent = () => {
-    if (!canMarkAttendance) return;
 
     const next = {};
 
-    members.forEach((member) => {
-      next[member.uid] = false;
-    });
+    members.forEach(
+      (member) => {
+        next[member.uid] = false;
+      }
+    );
 
     setMarks(next);
   };
 
+
+  // ----------------------------------------------------------
+  // SAVE
+  // ----------------------------------------------------------
+
   const save = async () => {
+
     if (
-      !sessionId ||
-      !profile?.groupId ||
-      members.length === 0 ||
-      !canMarkAttendance
+      !selectedSession ||
+      !canMarkAttendance ||
+      members.length === 0
     ) {
       return;
     }
@@ -573,6 +677,7 @@ function LeaderView({ profile }) {
     setError("");
 
     try {
+
       const group =
         await resolveGroup(
           profile.groupId
@@ -589,16 +694,24 @@ function LeaderView({ profile }) {
               ),
               {
                 sessionId,
-                groupId: group.ref,
-                uid: member.uid,
+
+                groupId:
+                  group.ref,
+
+                uid:
+                  member.uid,
+
                 name:
                   member.name || "",
+
                 present:
                   !!marks[
                     member.uid
                   ],
+
                 markedBy:
                   profile.id,
+
                 markedAt:
                   serverTimestamp(),
               }
@@ -607,25 +720,41 @@ function LeaderView({ profile }) {
       );
 
       setSavedAt(new Date());
+
+      
     } catch (err) {
+
       console.error(
-        "Failed to save attendance:",
+        "[Attendance] SAVE FAILED:",
         err
       );
 
       setError(
         err?.message ||
-          "Unable to save attendance. Please try again."
+          "Unable to save attendance."
       );
+
     } finally {
+
       setSaving(false);
+
     }
   };
 
+
+  // ----------------------------------------------------------
+  // COUNT
+  // ----------------------------------------------------------
+
   const presentCount =
-    Object.values(marks).filter(
-      Boolean
-    ).length;
+    Object.values(
+      marks
+    ).filter(Boolean).length;
+
+
+  // ----------------------------------------------------------
+  // RENDER
+  // ----------------------------------------------------------
 
   const loading =
     sessionsLoading ||
@@ -634,8 +763,22 @@ function LeaderView({ profile }) {
   return (
     <div className="space-y-6">
 
-      {/* Session selector */}
+      <div>
+        <h2 className="text-2xl font-serif font-bold text-slate-800">
+          Attendance
+        </h2>
+
+        <p className="text-sm text-slate-500 mt-1">
+          Manage attendance for lab sessions
+          assigned to your group.
+        </p>
+      </div>
+
+
+      {/* SESSION SELECTOR */}
+
       <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-5">
+
         <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
           Lab session
         </label>
@@ -649,8 +792,9 @@ function LeaderView({ profile }) {
             setError("");
           }}
           disabled={loading}
-          className="w-full sm:w-96 border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-100"
+          className="w-full sm:w-96 border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
+
           <option value="">
             {loading
               ? "Loading sessions…"
@@ -669,8 +813,9 @@ function LeaderView({ profile }) {
               >
                 {fmtDate(
                   session.date
-                )}{" "}
-                — {session.title}
+                )}
+                {" — "}
+                {session.title}
                 {session.status !==
                   "held"
                   ? ` (${session.status})`
@@ -678,23 +823,16 @@ function LeaderView({ profile }) {
               </option>
             )
           )}
+
         </select>
 
         {!loading &&
-          !profile?.groupId && (
-            <p className="mt-2 text-sm text-amber-600">
-              Your account is not assigned
-              to a group.
-            </p>
-          )}
-
-        {!loading &&
-          profile?.groupId &&
+          currentGroup &&
           sortedSessions.length ===
             0 && (
             <p className="mt-2 text-sm text-slate-400">
               No lab sessions are assigned
-              to your group.
+              to {currentGroup.name}.
             </p>
           )}
 
@@ -706,228 +844,282 @@ function LeaderView({ profile }) {
               have attendance recorded.
             </p>
           )}
+
       </div>
 
-      {/* Error */}
+
+      {/* ERROR */}
+
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm">
           {error}
         </div>
       )}
 
-      {/* Selected session */}
-      {sessionId &&
-        selectedSession && (
-          <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
 
-            {/* Header */}
-            <div className="px-5 py-4 border-b border-slate-200">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+      {/* SELECTED SESSION */}
 
-                <div>
-                  <div className="flex items-center gap-2">
-                    <p className="font-semibold text-slate-800">
-                      {
-                        selectedSession.title
-                      }
-                    </p>
+      {selectedSession && (
+        <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
 
-                    <StatusPill
-                      status={
-                        selectedSession.status
-                      }
-                    />
-                  </div>
+          {/* HEADER */}
 
-                  <p className="text-xs text-slate-400 mt-1">
-                    {fmtDate(
-                      selectedSession.date
-                    )}
-                    {" · "}
-                    {getTimeSlot(
-                      selectedSession
-                    )}
-                    {" · "}
-                    {selectedSession.venue ||
-                      "Venue not set"}
+          <div className="px-5 py-4 border-b border-slate-200">
+
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+
+              <div>
+
+                <div className="flex items-center gap-2">
+
+                  <p className="font-semibold text-slate-800">
+                    {
+                      selectedSession.title
+                    }
                   </p>
+
+                  <StatusPill
+                    status={
+                      selectedSession.status
+                    }
+                  />
+
                 </div>
 
-                {canMarkAttendance && (
-                  <span className="text-sm text-slate-500">
-                    {presentCount}/
-                    {members.length}{" "}
-                    present
-                  </span>
-                )}
+                <p className="text-xs text-slate-400 mt-1">
+                  {fmtDate(
+                    selectedSession.date
+                  )}
+                  {" · "}
+                  {getTimeSlot(
+                    selectedSession
+                  )}
+                  {" · "}
+                  {selectedSession.venue ||
+                    "Venue not set"}
+                </p>
+
               </div>
+
+              {canMarkAttendance && (
+                <span className="text-sm text-slate-500">
+                  {presentCount}/
+                  {members.length}
+                  {" present"}
+                </span>
+              )}
+
             </div>
 
-            {/* Scheduled/cancelled session */}
-            {!canMarkAttendance && (
-              <div className="px-5 py-4 bg-amber-50 border-b border-amber-200 text-sm text-amber-700">
-                Attendance can only be
-                marked after this lab is
-                marked as{" "}
-                <strong>held</strong>.
+          </div>
+
+
+          {/* NOT HELD */}
+
+          {!canMarkAttendance && (
+            <div className="px-5 py-4 bg-amber-50 border-b border-amber-200 text-sm text-amber-700">
+              Attendance can only be marked
+              after this lab is marked as{" "}
+              <strong>
+                held
+              </strong>.
+            </div>
+          )}
+
+
+          {/* ACTIONS */}
+
+          {canMarkAttendance && (
+            <div className="px-5 py-3 border-b border-slate-100 flex flex-wrap gap-2">
+
+              <button
+                type="button"
+                onClick={
+                  markAllPresent
+                }
+                disabled={
+                  loadingMembers ||
+                  members.length ===
+                    0
+                }
+                className="text-xs font-medium px-3 py-1.5 rounded-lg border border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 disabled:opacity-50"
+              >
+                Mark all present
+              </button>
+
+              <button
+                type="button"
+                onClick={
+                  markAllAbsent
+                }
+                disabled={
+                  loadingMembers ||
+                  members.length ===
+                    0
+                }
+                className="text-xs font-medium px-3 py-1.5 rounded-lg border border-red-200 text-red-700 bg-red-50 hover:bg-red-100 disabled:opacity-50"
+              >
+                Mark all absent
+              </button>
+
+            </div>
+          )}
+
+
+          {/* LOADING */}
+
+          {canMarkAttendance &&
+            loadingMembers && (
+              <div className="p-8 flex justify-center text-slate-400">
+                <Loader2
+                  className="animate-spin"
+                  size={20}
+                />
               </div>
             )}
 
-            {/* Quick actions */}
-            {canMarkAttendance && (
-              <div className="px-5 py-3 border-b border-slate-100 flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={
-                    markAllPresent
-                  }
-                  disabled={
-                    loadingMembers ||
-                    members.length ===
-                      0
-                  }
-                  className="text-xs font-medium px-3 py-1.5 rounded-lg border border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 disabled:opacity-50"
-                >
-                  Mark all present
-                </button>
 
-                <button
-                  type="button"
-                  onClick={
-                    markAllAbsent
-                  }
-                  disabled={
-                    loadingMembers ||
-                    members.length ===
-                      0
-                  }
-                  className="text-xs font-medium px-3 py-1.5 rounded-lg border border-red-200 text-red-700 bg-red-50 hover:bg-red-100 disabled:opacity-50"
-                >
-                  Mark all absent
-                </button>
+          {/* EMPTY */}
+
+          {canMarkAttendance &&
+            !loadingMembers &&
+            members.length ===
+              0 && (
+              <div className="p-8 text-center">
+
+                <p className="text-sm text-slate-500">
+                  No members found in your
+                  group.
+                </p>
+
+                <p className="text-xs text-slate-400 mt-1">
+                  Check Admin → Groups →
+                  Members.
+                </p>
+
               </div>
             )}
 
-            {/* Roster */}
-            {canMarkAttendance &&
-              (loadingMembers ? (
-                <div className="p-8 flex justify-center text-slate-400">
-                  <Loader2
-                    className="animate-spin"
-                    size={20}
-                  />
-                </div>
-              ) : members.length ===
-                0 ? (
-                <div className="p-8 text-center">
-                  <p className="text-sm text-slate-500">
-                    No members found in
-                    your group.
-                  </p>
 
-                  <p className="text-xs text-slate-400 mt-1">
-                    Check the group's Members
-                    list in the Admin Panel.
-                  </p>
-                </div>
-              ) : (
-                <ul className="divide-y divide-slate-100">
-                  {members.map(
-                    (member) => (
-                      <li
-                        key={member.uid}
-                        className="flex items-center justify-between gap-4 px-5 py-3"
-                      >
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium text-slate-700 truncate">
-                            {member.name ||
-                              "Unnamed"}
-                          </p>
+          {/* MEMBERS */}
 
-                          <p className="text-xs text-slate-400 truncate">
-                            {member.regNo ||
-                              member.email ||
-                              "No details"}
-                          </p>
-                        </div>
+          {canMarkAttendance &&
+            !loadingMembers &&
+            members.length >
+              0 && (
+              <ul className="divide-y divide-slate-100">
 
-                        <button
-                          type="button"
-                          onClick={() =>
-                            toggle(
-                              member.uid
-                            )
-                          }
-                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors shrink-0 ${
-                            marks[
-                              member.uid
-                            ]
-                              ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                              : "bg-red-50 text-red-700 border-red-200"
-                          }`}
-                        >
-                          {marks[
+                {members.map(
+                  (member) => (
+                    <li
+                      key={
+                        member.uid
+                      }
+                      className="flex items-center justify-between gap-4 px-5 py-3"
+                    >
+
+                      <div className="min-w-0">
+
+                        <p className="text-sm font-medium text-slate-700 truncate">
+                          {member.name ||
+                            "Unnamed"}
+                        </p>
+
+                        <p className="text-xs text-slate-400 truncate">
+                          {member.regNo ||
+                            member.email ||
+                            ""}
+                        </p>
+
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          toggle(
                             member.uid
-                          ] ? (
-                            <Check
-                              size={14}
-                            />
-                          ) : (
-                            <X
-                              size={14}
-                            />
-                          )}
-
-                          {marks[
+                          )
+                        }
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border shrink-0 ${
+                          marks[
                             member.uid
                           ]
-                            ? "Present"
-                            : "Absent"}
-                        </button>
-                      </li>
-                    )
-                  )}
-                </ul>
-              ))}
+                            ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                            : "bg-red-50 text-red-700 border-red-200"
+                        }`}
+                      >
 
-            {/* Save */}
-            {canMarkAttendance && (
-              <div className="px-5 py-4 border-t border-slate-200 flex flex-wrap items-center gap-3">
-                <button
-                  type="button"
-                  onClick={save}
-                  disabled={
-                    saving ||
-                    loadingMembers ||
-                    members.length ===
-                      0
-                  }
-                  className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
-                >
-                  {saving
-                    ? "Saving…"
-                    : "Save attendance"}
-                </button>
+                        {marks[
+                          member.uid
+                        ] ? (
+                          <Check
+                            size={14}
+                          />
+                        ) : (
+                          <X
+                            size={14}
+                          />
+                        )}
 
-                {savedAt && (
-                  <span className="text-xs text-emerald-600">
-                    Attendance saved
-                  </span>
+                        {marks[
+                          member.uid
+                        ]
+                          ? "Present"
+                          : "Absent"}
+
+                      </button>
+
+                    </li>
+                  )
                 )}
-              </div>
+
+              </ul>
             )}
-          </div>
-        )}
+
+
+          {/* SAVE */}
+
+          {canMarkAttendance && (
+            <div className="px-5 py-4 border-t border-slate-200 flex items-center gap-3">
+
+              <button
+                type="button"
+                onClick={save}
+                disabled={
+                  saving ||
+                  loadingMembers ||
+                  members.length ===
+                    0
+                }
+                className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-medium px-4 py-2 rounded-lg"
+              >
+                {saving
+                  ? "Saving…"
+                  : "Save attendance"}
+              </button>
+
+              {savedAt && (
+                <span className="text-xs text-emerald-600">
+                  Attendance saved
+                </span>
+              )}
+
+            </div>
+          )}
+
+        </div>
+      )}
+
     </div>
   );
 }
 
+
+// ============================================================
+// MEMBER VIEW
+// ============================================================
+
 function MemberView({ profile }) {
-  /*
-   * No orderBy here.
-   * The records are sorted using the actual
-   * lab date below.
-   */
   const {
     data: records,
   } = useCollection(
@@ -948,6 +1140,7 @@ function MemberView({ profile }) {
   );
 
   const rows = useMemo(() => {
+
     const sessionMap =
       Object.fromEntries(
         sessions.map(
@@ -979,6 +1172,7 @@ function MemberView({ profile }) {
             a.session.date
           )
       );
+
   }, [
     records,
     sessions,
@@ -1001,9 +1195,10 @@ function MemberView({ profile }) {
   return (
     <div className="space-y-6">
 
-      {/* Summary */}
       <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+
         <div>
+
           <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
             Overall attendance
           </p>
@@ -1013,6 +1208,7 @@ function MemberView({ profile }) {
               ? "—"
               : `${rate}%`}
           </p>
+
         </div>
 
         <p className="text-sm text-slate-500">
@@ -1020,11 +1216,14 @@ function MemberView({ profile }) {
           {rows.length} sessions
           attended
         </p>
+
       </div>
 
-      {/* History */}
+
       <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+
         <ul className="divide-y divide-slate-100">
+
           {rows.map(
             (record) => (
               <li
@@ -1033,7 +1232,9 @@ function MemberView({ profile }) {
                 }
                 className="flex items-center justify-between gap-4 px-5 py-3"
               >
+
                 <div className="min-w-0">
+
                   <p className="text-sm font-medium text-slate-700 truncate">
                     {
                       record.session
@@ -1055,6 +1256,7 @@ function MemberView({ profile }) {
                       .venue ||
                       "Venue not set"}
                   </p>
+
                 </div>
 
                 <StatusPill
@@ -1064,6 +1266,7 @@ function MemberView({ profile }) {
                       : "absent"
                   }
                 />
+
               </li>
             )
           )}
@@ -1073,11 +1276,18 @@ function MemberView({ profile }) {
               No attendance records yet
             </li>
           )}
+
         </ul>
+
       </div>
     </div>
   );
 }
+
+
+// ============================================================
+// PAGE
+// ============================================================
 
 export default function Attendance() {
   const {
@@ -1086,9 +1296,11 @@ export default function Attendance() {
     isAdmin,
   } = useAuth();
 
-  if (!profile) return null;
+  if (!profile) {
+    return null;
+  }
 
-  const canManageAttendance =
+  const canManage =
     isLeader || isAdmin;
 
   return (
@@ -1100,13 +1312,13 @@ export default function Attendance() {
         </h2>
 
         <p className="text-sm text-slate-500 mt-1">
-          {canManageAttendance
-            ? "Mark attendance for lab sessions assigned to your group."
+          {canManage
+            ? "Manage attendance for your group's lab sessions."
             : "Your lab session attendance history."}
         </p>
       </div>
 
-      {canManageAttendance ? (
+      {canManage ? (
         <LeaderView
           profile={profile}
         />
@@ -1115,6 +1327,7 @@ export default function Attendance() {
           profile={profile}
         />
       )}
+
     </div>
   );
 }
