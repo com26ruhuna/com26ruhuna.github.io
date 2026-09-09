@@ -9,12 +9,15 @@ import {
   FlaskConical,
   CalendarDays,
   ClipboardList,
+  BarChart3,
 } from "lucide-react";
 
 import { useAuth } from "../context/AuthContext";
 import { useCollection } from "../hooks/useFirestore";
 import { ResourceManager } from "../components/admin/ResourceManager";
 import { SignupRequests } from "../components/admin/SignupRequests";
+import { AdminAnalytics } from "../components/admin/AdminAnalytics";
+import { BulkLabCreator } from "../components/admin/BulkLabCreator";
 
 const TABS = [
   {
@@ -46,6 +49,11 @@ const TABS = [
     key: "assessments",
     label: "Assessments",
     icon: ClipboardList,
+  },
+  {
+    key: "analytics",
+    label: "Analytics",
+    icon: BarChart3,
   },
 ];
 
@@ -150,8 +158,8 @@ export default function Admin() {
             "groupId",
             "regNo",
           ]}
-          allowCreate={false}
-          helperText="People don't get access just by signing in. Approve them from the Signups tab first, then fine-tune their role, group, and reg no. here."
+          allowCreate={true}
+          helperText="Approve users from the Signups tab, or manually create them here. Fine-tune their role, group, and reg no. as needed."
           emptyLabel='No approved users yet. Check the "Signups" tab for people waiting on approval.'
           fields={[
             {
@@ -234,72 +242,85 @@ export default function Admin() {
 
       {/* Lab Sessions */}
       {tab === "labs" && (
-        <ResourceManager
-          collectionName="labSessions"
-          orderByField="date"
-          columns={[
-            "title",
-            "date",
-            "startTime",
-            "endTime",
-            "status",
-          ]}
-          emptyLabel="No lab sessions scheduled"
-          fields={[
-            {
-              key: "title",
-              label: "Title",
-              type: "text",
-              placeholder:
-                "Lab 04 — Digital Logic",
-            },
-            {
-              key: "topic",
-              label: "Topic",
-              type: "text",
-            },
-            {
-              key: "date",
-              label: "Date",
-              type: "date",
-            },
-            {
-              key: "startTime",
-              label: "Start Time",
-              type: "time",
-            },
-            {
-              key: "endTime",
-              label: "End Time",
-              type: "time",
-            },
-            {
-              key: "venue",
-              label: "Venue",
-              type: "text",
-              placeholder:
-                "Computer Lab 01",
-            },
-            {
-              key: "status",
-              label: "Status",
-              type: "select",
-              options: [
-                "scheduled",
-                "held",
-                "cancelled",
-              ],
-            },
-            {
-              key: "groupIds",
-              label: "Groups",
-              type: "docRefMulti",
-              ref: "groups",
-              refLabel: "name",
-              wide: true,
-            },
-          ]}
-        />
+        <>
+          <div className="flex items-center justify-end">
+            <BulkLabCreator />
+          </div>
+
+          <ResourceManager
+            collectionName="labSessions"
+            orderByField="date"
+            columns={[
+              "labNumber",
+              "title",
+              "date",
+              "startTime",
+              "endTime",
+              "status",
+            ]}
+            emptyLabel="No lab sessions scheduled"
+            fields={[
+              {
+                key: "labNumber",
+                label: "Lab Number",
+                type: "number",
+                placeholder: "e.g. 1",
+              },
+              {
+                key: "title",
+                label: "Title",
+                type: "text",
+                placeholder:
+                  "Lab 04 — Digital Logic",
+              },
+              {
+                key: "topic",
+                label: "Topic",
+                type: "text",
+              },
+              {
+                key: "date",
+                label: "Date",
+                type: "date",
+              },
+              {
+                key: "startTime",
+                label: "Start Time",
+                type: "time",
+              },
+              {
+                key: "endTime",
+                label: "End Time",
+                type: "time",
+              },
+              {
+                key: "venue",
+                label: "Venue",
+                type: "text",
+                placeholder:
+                  "Computer Lab 01",
+              },
+              {
+                key: "status",
+                label: "Status",
+                type: "select",
+                options: [
+                  "scheduled",
+                  "held",
+                  "cancelled",
+                ],
+              },
+              {
+                key: "groupIds",
+                label: "Groups",
+                type: "docRefMulti",
+                ref: "groups",
+                refLabel: "name",
+                wide: true,
+              },
+            ]}
+          />
+        </>
       )}
 
       {/* Lectures */}
@@ -435,6 +456,11 @@ export default function Admin() {
             },
           ]}
         />
+      )}
+
+      {/* Analytics */}
+      {tab === "analytics" && (
+        <AdminAnalytics />
       )}
     </div>
   );

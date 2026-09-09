@@ -17,6 +17,7 @@ import {
   X,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
+import { UserAvatar } from "./UserAvatar";
 
 const navLinks = [
   { path: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -125,18 +126,27 @@ export default function Layout() {
 
         {/* User / role footer */}
         <div className="p-4 border-t border-slate-800 bg-slate-950/50">
-          <div className="flex items-center gap-2 mb-3 text-xs text-slate-400">
-            <ShieldCheck size={16} className="text-blue-400 shrink-0" />
+          <div className="flex items-center gap-3 mb-3">
+            <UserAvatar
+              photoURL={profile?.photoURL}
+              name={profile?.name}
+              size="md"
+            />
 
-            <span className="truncate">
-              {profile?.role === "admin"
-                ? "Administrator"
-                : profile?.role === "leader"
-                ? "Group Leader"
-                : "Member"}
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-white truncate">
+                {profile?.name || "User"}
+              </p>
 
-              {profile?.groupId ? ` · ${profile.groupId}` : ""}
-            </span>
+              <p className="text-xs text-slate-400 truncate">
+                {profile?.role === "admin"
+                  ? "Administrator"
+                  : profile?.role === "leader"
+                  ? "Group Leader"
+                  : "Member"}
+                {profile?.groupId ? ` · ${profile.groupId}` : ""}
+              </p>
+            </div>
           </div>
 
           <button
@@ -178,9 +188,11 @@ export default function Layout() {
 
           {/* User section */}
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-            <div className="w-9 h-9 rounded-full bg-blue-900 text-white flex items-center justify-center font-bold text-sm shadow-inner">
-              CE
-            </div>
+            <UserAvatar
+              photoURL={profile?.photoURL}
+              name={profile?.name}
+              size="sm"
+            />
 
             <div className="hidden sm:block text-right">
               <span className="block text-xs font-semibold text-slate-700">

@@ -18,6 +18,7 @@ import {
 import { useAuth } from "../context/AuthContext";
 import { useCollection } from "../hooks/useFirestore";
 import { StatusPill } from "../components/StatusPill";
+import { UserAvatar } from "../components/UserAvatar";
 
 function todayISO() {
   const now = new Date();
@@ -487,22 +488,30 @@ export default function Dashboard() {
     <div className="space-y-8">
 
       {/* Welcome */}
-      <div>
-        <h2 className="text-2xl font-serif font-bold text-slate-800">
-          Welcome back
-          {profile?.name
-            ? `, ${
-                profile.name.split(
-                  " "
-                )[0]
-              }`
-            : ""}
-        </h2>
+      <div className="flex items-center gap-4">
+        <UserAvatar
+          photoURL={profile?.photoURL}
+          name={profile?.name}
+          size="lg"
+        />
 
-        <p className="text-sm text-slate-500 mt-1">
-          Here's what's coming up for the
-          Computer Engineering batch.
-        </p>
+        <div>
+          <h2 className="text-2xl font-serif font-bold text-slate-800">
+            Welcome back
+            {profile?.name
+              ? `, ${
+                  profile.name.split(
+                    " "
+                  )[0]
+                }`
+              : ""}
+          </h2>
+
+          <p className="text-sm text-slate-500 mt-1">
+            Here's what's coming up for the
+            Computer Engineering batch.
+          </p>
+        </div>
       </div>
 
       {/* Next cards */}

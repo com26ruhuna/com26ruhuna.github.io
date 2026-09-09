@@ -1,6 +1,6 @@
 // src/components/admin/ResourceManager.jsx
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 
 import {
   addDoc,
@@ -15,6 +15,7 @@ import {
 import { db } from "../../config/firebase";
 import { useCollection } from "../../hooks/useFirestore";
 import { StatusPill } from "../StatusPill";
+import { UserAvatar } from "../UserAvatar";
 
 import {
   Pencil,
@@ -22,6 +23,8 @@ import {
   Plus,
   X,
   Loader2,
+  Search,
+  ArrowUpDown,
 } from "lucide-react";
 
 const PILL_KEYS = new Set([
@@ -184,6 +187,10 @@ export function ResourceManager({
     setConfirmDeleteId,
   ] = useState(null);
 
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortKey, setSortKey] = useState(null);
+  const [sortDir, setSortDir] = useState('asc');
+
   const columnFields = (
     columns && columns.length
       ? columns
@@ -197,6 +204,49 @@ export function ResourceManager({
       )
     )
     .filter(Boolean);
+
+  const filteredItems = useMemo(() => {
+    let result = items;
+    
+    // Search filter
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter((item) =>
+        columnFields.some((field) => {
+          const raw = item[field.key];
+          if (raw === null || raw === undefined) return false;
+          
+          // For doc refs, search by resolved label
+          if (field.type === 'docRef') {
+            const id = raw?.id ?? '';
+            const match = refOptions[field.ref]?.find((opt) => opt.id === id);
+            return match?.[field.refLabel]?.toLowerCase().includes(q) || false;
+          }
+          if (field.type === 'docRefMulti') {
+            const ids = (raw || []).map((r) => r?.id ?? '');
+            return ids.some((id) => {
+              const match = refOptions[field.ref]?.find((opt) => opt.id === id);
+              return match?.[field.refLabel]?.toLowerCase().includes(q) || false;
+            });
+          }
+          
+          return String(raw).toLowerCase().includes(q);
+        })
+      );
+    }
+    
+    // Sort
+    if (sortKey) {
+      result = [...result].sort((a, b) => {
+        const aVal = String(a[sortKey] ?? '').toLowerCase();
+        const bVal = String(b[sortKey] ?? '').toLowerCase();
+        const cmp = aVal.localeCompare(bVal);
+        return sortDir === 'asc' ? cmp : -cmp;
+      });
+    }
+    
+    return result;
+  }, [items, searchQuery, sortKey, sortDir, columnFields, refOptions]);
 
   const startCreate = () => {
     const initial = {};
@@ -421,6 +471,7 @@ export function ResourceManager({
       {/* Summary + Add */}
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm text-slate-500">
+          {searchQuery ? `${filteredItems.length} of ` : ""}
           {items.length}{" "}
           {items.length === 1
             ? "record"
@@ -439,6 +490,20 @@ export function ResourceManager({
             </button>
           )}
       </div>
+
+      {/* Search */}
+      {items.length > 0 && (
+        <div className="relative">
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search records..."
+            className="w-full sm:w-72 pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+      )}
 
       {helperText && (
         <p className="text-xs text-slate-400 -mt-2">
@@ -779,9 +844,22 @@ export function ResourceManager({
                     (field) => (
                       <th
                         key={field.key}
-                        className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap"
+                        className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap cursor-pointer hover:text-slate-700 select-none"
+                        onClick={() => {
+                          if (sortKey === field.key) {
+                            setSortDir((prev) => prev === 'asc' ? 'desc' : 'asc');
+                          } else {
+                            setSortKey(field.key);
+                            setSortDir('asc');
+                          }
+                        }}
                       >
-                        {field.label}
+                        <span className="flex items-center gap-1">
+                          {field.label}
+                          {sortKey === field.key && (
+                            <ArrowUpDown size={12} className="text-blue-500" />
+                          )}
+                        </span>
                       </th>
                     )
                   )}
@@ -791,7 +869,7 @@ export function ResourceManager({
               </thead>
 
               <tbody className="divide-y divide-slate-100">
-                {items.map((item) => (
+                {filteredItems.map((item) => (
                   <tr key={item.id}>
 
                     {columnFields.map(
@@ -800,28 +878,33 @@ export function ResourceManager({
                           key={field.key}
                           className="px-4 py-3 text-slate-600 whitespace-nowrap"
                         >
-                          {PILL_KEYS.has(
-                            field.key
-                          ) &&
-                          item[
-                            field.key
-                          ] ? (
-                            <StatusPill
-                              status={
+                          <span className="flex items-center gap-2">
+                            {field.key === 'name' && item.photoURL !== undefined && (
+                              <UserAvatar photoURL={item.photoURL} name={item.name} size="xs" />
+                            )}
+                            {PILL_KEYS.has(
+                              field.key
+                            ) &&
+                            item[
+                              field.key
+                            ] ? (
+                              <StatusPill
+                                status={
+                                  item[
+                                    field.key
+                                  ]
+                                }
+                              />
+                            ) : (
+                              displayValue(
+                                field,
                                 item[
                                   field.key
-                                ]
-                              }
-                            />
-                          ) : (
-                            displayValue(
-                              field,
-                              item[
-                                field.key
-                              ],
-                              refOptions
-                            )
-                          )}
+                                ],
+                                refOptions
+                              )
+                            )}
+                          </span>
                         </td>
                       )
                     )}
@@ -875,6 +958,12 @@ export function ResourceManager({
                 ))}
               </tbody>
             </table>
+
+            {filteredItems.length === 0 && items.length > 0 && searchQuery && (
+              <p className="p-8 text-center text-sm text-slate-400">
+                No records match "{searchQuery}"
+              </p>
+            )}
           </div>
         )}
       </div>
