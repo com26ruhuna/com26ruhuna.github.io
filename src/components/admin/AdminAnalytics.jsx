@@ -4,6 +4,13 @@ import { UserAvatar } from '../UserAvatar';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { Users, UsersRound, FlaskConical, CheckSquare, Loader2 } from 'lucide-react';
 
+function refToId(value) {
+  if (!value) return "";
+  if (typeof value === "string") return value;
+  if (value?.id) return value.id;
+  return String(value);
+}
+
 export function AdminAnalytics() {
   const { data: users, loading: usersLoading } = useCollection('users');
   const { data: groups, loading: groupsLoading } = useCollection('groups');
@@ -59,7 +66,7 @@ export function AdminAnalytics() {
   const groupAttendanceData = useMemo(() => {
     if (!groups || !attendance) return [];
     return groups.map(g => {
-      const gRecords = attendance.filter(r => r.groupId?.id === g.id);
+      const gRecords = attendance.filter(r => refToId(r.groupId) === g.id);
       const total = gRecords.length;
       const present = gRecords.filter(r => r.present).length;
       const rate = total > 0 ? (present / total) * 100 : 0;
@@ -79,7 +86,7 @@ export function AdminAnalytics() {
       const present = uRecords.filter(r => r.present).length;
       const rate = total > 0 ? (present / total) * 100 : 0;
       
-      const groupIdStr = u.groupId?.id || u.groupId;
+      const groupIdStr = refToId(u.groupId);
       const userGroup = groups.find(g => g.id === groupIdStr);
       
       return {

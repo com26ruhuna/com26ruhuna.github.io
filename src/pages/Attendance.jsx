@@ -208,6 +208,36 @@ function AttendancePie({ present, absent, size = 160 }) {
 
 
 // ============================================================
+// REFERENCE HELPERS
+// ============================================================
+
+/**
+ * Extract a plain string ID from a value that could be:
+ *   - A Firestore DocumentReference (has .id and .path)
+ *   - A plain string ID
+ *   - null / undefined
+ */
+function refToId(value) {
+  if (!value) return "";
+  if (typeof value === "string") return value;
+  if (value?.id) return value.id;
+  return String(value);
+}
+
+/**
+ * Check if a groupIds array (which may contain refs or strings)
+ * includes a given group ID string.
+ */
+function groupIdsInclude(groupIds, targetGroupId) {
+  if (!Array.isArray(groupIds) || !targetGroupId) return false;
+
+  return groupIds.some(
+    (entry) => refToId(entry) === targetGroupId
+  );
+}
+
+
+// ============================================================
 // ADMIN VIEW
 // ============================================================
 
@@ -247,7 +277,7 @@ function AdminView() {
   const groupStats = useMemo(() => {
     return groups.map((group) => {
       const groupRecords = allRecords.filter(
-        (record) => record.groupId?.id === group.id
+        (record) => refToId(record.groupId) === group.id
       );
 
       const present = groupRecords.filter(
@@ -296,20 +326,17 @@ function AdminView() {
     if (!group) return [];
 
     const memberUids = new Set(
-      (group.members || []).map((ref) => ref?.id).filter(Boolean)
+      (group.members || []).map((ref) => refToId(ref)).filter(Boolean)
     );
 
     const groupRecords = allRecords.filter(
-      (record) => record.groupId?.id === selectedGroupId
+      (record) => refToId(record.groupId) === selectedGroupId
     );
 
     const heldSessions = allSessions.filter((session) => {
       if (session.status !== "held") return false;
 
-      return Array.isArray(session.groupIds) &&
-        session.groupIds.some(
-          (ref) => ref?.id === selectedGroupId
-        );
+      return groupIdsInclude(session.groupIds, selectedGroupId);
     });
 
     const totalSessions = heldSessions.length;
@@ -358,10 +385,7 @@ function AdminView() {
     if (!selectedGroupId) return [];
 
     const groupSessions = allSessions.filter((session) => {
-      return Array.isArray(session.groupIds) &&
-        session.groupIds.some(
-          (ref) => ref?.id === selectedGroupId
-        );
+      return groupIdsInclude(session.groupIds, selectedGroupId);
     });
 
     return groupSessions
@@ -369,7 +393,7 @@ function AdminView() {
         const sessionRecords = allRecords.filter(
           (record) =>
             record.sessionId === session.id &&
-            record.groupId?.id === selectedGroupId
+            refToId(record.groupId) === selectedGroupId
         );
 
         const present = sessionRecords.filter(
@@ -819,13 +843,16 @@ function LeaderView({ profile }) {
   // Group attendance records (real-time via onSnapshot)
   // ----------------------------------------------------------
 
-  const { data: groupAttendanceRecords } = useCollection(
-    "attendanceRecords",
-    currentGroupId
-      ? [where("groupId", "==", doc(db, "groups", currentGroupId))]
-      : []
+  const { data: allAttendanceRecords } = useCollection(
+    "attendanceRecords"
   );
 
+  const groupAttendanceRecords = useMemo(() => {
+    if (!currentGroupId) return [];
+    return allAttendanceRecords.filter(
+      (record) => refToId(record.groupId) === currentGroupId
+    );
+  }, [allAttendanceRecords, currentGroupId]);
 
   // ----------------------------------------------------------
   // Group attendance summary
@@ -1016,32 +1043,20 @@ function LeaderView({ profile }) {
         if (cancelled) return;
         setMembers(roster);
 
-        // Load existing records
-        const attendanceQuery = query(
-          collection(db, "attendanceRecords"),
-          where("groupId", "==", group.ref)
-        );
-
-        const attendanceSnapshot =
-          await getDocs(attendanceQuery);
-
-        if (cancelled) return;
-
+        // Load existing records from our previously fetched groupAttendanceRecords
         const existingMarks = {};
 
         roster.forEach((member) => {
           existingMarks[member.uid] = false;
         });
 
-        attendanceSnapshot.forEach((recordDoc) => {
-          const data = recordDoc.data();
-
+        groupAttendanceRecords.forEach((record) => {
           if (
-            data.sessionId === sessionId &&
-            data.uid
+            record.sessionId === sessionId &&
+            record.uid
           ) {
-            existingMarks[data.uid] =
-              data.present === true;
+            existingMarks[record.uid] =
+              record.present === true;
           }
         });
 

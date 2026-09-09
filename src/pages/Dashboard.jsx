@@ -338,11 +338,13 @@ export default function Dashboard() {
         Array.isArray(
           session.groupIds
         ) &&
-        session.groupIds.some(
-          (groupRef) =>
-            groupRef?.id ===
-            profile.groupId
-        )
+        session.groupIds.some((groupRef) => {
+          const refId =
+            typeof groupRef === "string"
+              ? groupRef
+              : groupRef?.id;
+          return refId === profile.groupId;
+        })
     );
   }, [
     labs,
