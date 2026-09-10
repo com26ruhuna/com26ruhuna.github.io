@@ -958,7 +958,6 @@ function AdminView() {
 // LEADER VIEW
 // ============================================================
 
-function LeaderView({ profile }) {
 function LeaderView({ profile, isAdmin = false }) {
   // ----------------------------------------------------------
   // Data
@@ -972,11 +971,9 @@ function LeaderView({ profile, isAdmin = false }) {
 
 
   // ----------------------------------------------------------
-  // Current group
   // Admin group selector state
   // ----------------------------------------------------------
 
-  const currentGroup = useMemo(() => {
   const [adminSelectedGroupId, setAdminSelectedGroupId] = useState("");
 
 
@@ -1057,27 +1054,8 @@ function LeaderView({ profile, isAdmin = false }) {
     if (!currentGroupId) return [];
 
     return allSessions.filter((session) => {
-      if (Array.isArray(session.groupIds)) {
-        return session.groupIds.some((groupRef) => {
-          if (groupRef?.id) {
-            return groupRef.id === currentGroupId;
-          }
-
-          if (typeof groupRef === "string") {
-            return (
-              groupRef === currentGroupId ||
-              groupRef === profile?.groupId
-            );
-          }
-
-          return false;
-        });
-      }
-
-      return false;
       return groupIdsInclude(session.groupIds, currentGroupId);
     });
-  }, [allSessions, currentGroupId, profile?.groupId]);
   }, [allSessions, currentGroupId]);
 
 
@@ -1158,7 +1136,6 @@ function LeaderView({ profile, isAdmin = false }) {
   useEffect(() => {
     if (
       !sessionId ||
-      !profile?.groupId ||
       !currentGroupId ||
       !canMarkAttendance
     ) {
@@ -1180,7 +1157,6 @@ function LeaderView({ profile, isAdmin = false }) {
 
       try {
         const group = await resolveGroup(
-          profile.groupId
           currentGroupId
         );
 
@@ -1260,7 +1236,6 @@ function LeaderView({ profile, isAdmin = false }) {
     return () => {
       cancelled = true;
     };
-  }, [sessionId, profile?.groupId, canMarkAttendance]);
   }, [sessionId, currentGroupId, canMarkAttendance, groupAttendanceRecords]);
 
 
@@ -1301,7 +1276,6 @@ function LeaderView({ profile, isAdmin = false }) {
   const save = async () => {
     if (
       !sessionId ||
-      !profile?.groupId ||
       !currentGroupId ||
       !selectedSession ||
       !canMarkAttendance ||
@@ -1316,7 +1290,6 @@ function LeaderView({ profile, isAdmin = false }) {
 
     try {
       const group = await resolveGroup(
-        profile.groupId
         currentGroupId
       );
 
@@ -1485,7 +1458,6 @@ function LeaderView({ profile, isAdmin = false }) {
             setError("");
             setSearchQuery("");
           }}
-          disabled={isLoading}
           disabled={isLoading || !currentGroupId}
           className="w-full sm:w-96 border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-100"
         >
@@ -1954,7 +1926,6 @@ export default function Attendance() {
 
           {adminTab === "analytics" && <AdminView />}
           {adminTab === "mark" && (
-            <LeaderView profile={profile} />
             <LeaderView profile={profile} isAdmin={true} />
           )}
           {adminTab === "my" && (
