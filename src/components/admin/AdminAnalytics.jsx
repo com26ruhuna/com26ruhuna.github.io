@@ -79,8 +79,8 @@ export function AdminAnalytics() {
 
   const topStudents = useMemo(() => {
     if (!users || !groups || !attendance) return [];
-    const members = users.filter(u => u.role === 'member' || u.role === 'leader');
-    const studentStats = members.map(u => {
+    // All users are students (admins included)
+    const studentStats = users.map(u => {
       const uRecords = attendance.filter(r => r.uid === u.id);
       const total = uRecords.length;
       const present = uRecords.filter(r => r.present).length;

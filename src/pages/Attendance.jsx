@@ -344,8 +344,7 @@ function AdminView() {
     const students = allUsers
       .filter(
         (user) =>
-          memberUids.has(user.id) &&
-          (user.role === "member" || user.role === "leader")
+          memberUids.has(user.id)
       )
       .map((user) => {
         const userRecords = groupRecords.filter(
@@ -456,6 +455,68 @@ function AdminView() {
 
 
   // ----------------------------------------------------------
+  // Per-lab-title attendance (aggregated across all groups)
+  // ----------------------------------------------------------
+
+  const labTitleStats = useMemo(() => {
+    // Group sessions by labNumber (preferred) or title
+    const buckets = {};
+
+    allSessions.forEach((session) => {
+      const key = session.labNumber
+        ? `Lab ${session.labNumber}`
+        : session.title || "Untitled";
+
+      if (!buckets[key]) {
+        buckets[key] = {
+          key,
+          labNumber: session.labNumber || null,
+          title: session.title || "Untitled",
+          sessionIds: [],
+          groupCount: 0,
+        };
+      }
+
+      buckets[key].sessionIds.push(session.id);
+      // Count unique groups across sessions with same lab title
+      const gCount = Array.isArray(session.groupIds)
+        ? session.groupIds.length
+        : 0;
+      buckets[key].groupCount += gCount;
+    });
+
+    return Object.values(buckets)
+      .map((bucket) => {
+        const bucketRecords = allRecords.filter((record) =>
+          bucket.sessionIds.includes(record.sessionId)
+        );
+
+        const present = bucketRecords.filter(
+          (record) => record.present === true
+        ).length;
+
+        const total = bucketRecords.length;
+
+        return {
+          ...bucket,
+          present,
+          absent: total - present,
+          total,
+          rate: total > 0
+            ? Math.round((present / total) * 100)
+            : 0,
+        };
+      })
+      .sort((a, b) => {
+        if (a.labNumber && b.labNumber) {
+          return a.labNumber - b.labNumber;
+        }
+        return a.key.localeCompare(b.key);
+      });
+  }, [allSessions, allRecords]);
+
+
+  // ----------------------------------------------------------
   // Render
   // ----------------------------------------------------------
 
@@ -535,6 +596,95 @@ function AdminView() {
               />
             </BarChart>
           </ResponsiveContainer>
+        </div>
+      )}
+
+
+      {/* Absent by Lab Title (across all groups) */}
+      {labTitleStats.length > 0 && (
+        <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+          <div className="px-5 py-4 border-b border-slate-200">
+            <h3 className="text-sm font-semibold text-slate-700">
+              Attendance by Lab (All Groups Combined)
+            </h3>
+            <p className="text-xs text-slate-400 mt-1">
+              Same lab scheduled across different groups is aggregated here.
+            </p>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-200 text-left">
+                  <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                    Lab
+                  </th>
+                  <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                    Title
+                  </th>
+                  <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide text-center">
+                    Groups
+                  </th>
+                  <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide text-center">
+                    Present
+                  </th>
+                  <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide text-center">
+                    Absent
+                  </th>
+                  <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide text-center">
+                    Total
+                  </th>
+                  <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                    Rate
+                  </th>
+                </tr>
+              </thead>
+
+              <tbody className="divide-y divide-slate-100">
+                {labTitleStats.map((lab) => (
+                  <tr key={lab.key}>
+                    <td className="px-4 py-3 text-slate-700 font-medium whitespace-nowrap">
+                      {lab.key}
+                    </td>
+                    <td className="px-4 py-3 text-slate-500 truncate max-w-[200px]">
+                      {lab.title}
+                    </td>
+                    <td className="px-4 py-3 text-slate-500 text-center">
+                      {lab.groupCount}
+                    </td>
+                    <td className="px-4 py-3 text-emerald-600 font-medium text-center">
+                      {lab.present}
+                    </td>
+                    <td className="px-4 py-3 text-red-600 font-medium text-center">
+                      {lab.absent}
+                    </td>
+                    <td className="px-4 py-3 text-slate-500 text-center">
+                      {lab.total}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <div className="w-16 h-2 bg-slate-100 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full rounded-full ${
+                              lab.rate >= 75
+                                ? "bg-emerald-500"
+                                : lab.rate >= 50
+                                ? "bg-amber-500"
+                                : "bg-red-500"
+                            }`}
+                            style={{ width: `${lab.rate}%` }}
+                          />
+                        </div>
+                        <span className="text-xs text-slate-500">
+                          {lab.rate}%
+                        </span>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
@@ -808,7 +958,7 @@ function AdminView() {
 // LEADER VIEW
 // ============================================================
 
-function LeaderView({ profile }) {
+function LeaderView({ profile, isAdmin = false }) {
   // ----------------------------------------------------------
   // Data
   // ----------------------------------------------------------
@@ -821,10 +971,17 @@ function LeaderView({ profile }) {
 
 
   // ----------------------------------------------------------
-  // Current group
+  // Admin group selector state
   // ----------------------------------------------------------
 
-  const currentGroup = useMemo(() => {
+  const [adminSelectedGroupId, setAdminSelectedGroupId] = useState("");
+
+
+  // ----------------------------------------------------------
+  // Current group (admin can pick any group, leaders use their own)
+  // ----------------------------------------------------------
+
+  const ownGroup = useMemo(() => {
     if (!profile?.groupId) return null;
 
     return (
@@ -835,6 +992,19 @@ function LeaderView({ profile }) {
       ) || null
     );
   }, [groups, profile?.groupId]);
+
+  // For admins: use the selected group, fallback to their own
+  const activeGroupId = useMemo(() => {
+    if (isAdmin && adminSelectedGroupId) {
+      return adminSelectedGroupId;
+    }
+    return ownGroup?.id || null;
+  }, [isAdmin, adminSelectedGroupId, ownGroup]);
+
+  const currentGroup = useMemo(() => {
+    if (!activeGroupId) return null;
+    return groups.find((g) => g.id === activeGroupId) || null;
+  }, [groups, activeGroupId]);
 
   const currentGroupId = currentGroup?.id || null;
 
@@ -884,26 +1054,9 @@ function LeaderView({ profile }) {
     if (!currentGroupId) return [];
 
     return allSessions.filter((session) => {
-      if (Array.isArray(session.groupIds)) {
-        return session.groupIds.some((groupRef) => {
-          if (groupRef?.id) {
-            return groupRef.id === currentGroupId;
-          }
-
-          if (typeof groupRef === "string") {
-            return (
-              groupRef === currentGroupId ||
-              groupRef === profile?.groupId
-            );
-          }
-
-          return false;
-        });
-      }
-
-      return false;
+      return groupIdsInclude(session.groupIds, currentGroupId);
     });
-  }, [allSessions, currentGroupId, profile?.groupId]);
+  }, [allSessions, currentGroupId]);
 
 
   // ----------------------------------------------------------
@@ -983,7 +1136,7 @@ function LeaderView({ profile }) {
   useEffect(() => {
     if (
       !sessionId ||
-      !profile?.groupId ||
+      !currentGroupId ||
       !canMarkAttendance
     ) {
       setMembers([]);
@@ -1004,7 +1157,7 @@ function LeaderView({ profile }) {
 
       try {
         const group = await resolveGroup(
-          profile.groupId
+          currentGroupId
         );
 
         if (cancelled) return;
@@ -1083,7 +1236,7 @@ function LeaderView({ profile }) {
     return () => {
       cancelled = true;
     };
-  }, [sessionId, profile?.groupId, canMarkAttendance]);
+  }, [sessionId, currentGroupId, canMarkAttendance, groupAttendanceRecords]);
 
 
   // ----------------------------------------------------------
@@ -1123,7 +1276,7 @@ function LeaderView({ profile }) {
   const save = async () => {
     if (
       !sessionId ||
-      !profile?.groupId ||
+      !currentGroupId ||
       !selectedSession ||
       !canMarkAttendance ||
       members.length === 0
@@ -1137,7 +1290,7 @@ function LeaderView({ profile }) {
 
     try {
       const group = await resolveGroup(
-        profile.groupId
+        currentGroupId
       );
 
       await Promise.all(
@@ -1210,6 +1363,47 @@ function LeaderView({ profile }) {
   return (
     <div className="space-y-6">
 
+      {/* Admin Group Selector */}
+      {isAdmin && (
+        <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-5">
+          <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
+            Select Group
+          </label>
+
+          <select
+            value={adminSelectedGroupId}
+            onChange={(e) => {
+              setAdminSelectedGroupId(e.target.value);
+              setSessionId("");
+              setMembers([]);
+              setMarks({});
+              setError("");
+              setSearchQuery("");
+            }}
+            disabled={groupsLoading}
+            className="w-full sm:w-72 border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-100"
+          >
+            <option value="">
+              {ownGroup
+                ? `${ownGroup.name || ownGroup.id} (Your group)`
+                : "Select a group…"}
+            </option>
+
+            {groups
+              .filter((g) => g.id !== ownGroup?.id)
+              .map((group) => (
+                <option key={group.id} value={group.id}>
+                  {group.name || group.id}
+                </option>
+              ))}
+          </select>
+
+          <p className="text-xs text-slate-400 mt-2">
+            You can mark attendance for any group as an administrator.
+          </p>
+        </div>
+      )}
+
       {/* Group Summary with Pie Chart */}
       {currentGroup && groupSummary.total > 0 && (
         <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-5">
@@ -1264,12 +1458,14 @@ function LeaderView({ profile }) {
             setError("");
             setSearchQuery("");
           }}
-          disabled={isLoading}
+          disabled={isLoading || !currentGroupId}
           className="w-full sm:w-96 border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-100"
         >
           <option value="">
             {isLoading
               ? "Loading sessions…"
+              : !currentGroupId
+              ? "Select a group first…"
               : "Select a session…"}
           </option>
 
@@ -1292,6 +1488,7 @@ function LeaderView({ profile }) {
         </select>
 
         {!isLoading &&
+          !isAdmin &&
           !profile?.groupId && (
             <p className="mt-2 text-sm text-amber-600">
               Your account is not assigned to a group.
@@ -1679,12 +1876,14 @@ export default function Attendance() {
   const { profile, isLeader, isAdmin } =
     useAuth();
 
+  const [adminTab, setAdminTab] = useState("analytics");
+
   if (!profile) {
     return null;
   }
 
   const subtitle = isAdmin
-    ? "View and analyze attendance across all groups."
+    ? "Analytics, attendance marking, and your personal history."
     : isLeader
     ? "Manage attendance for your group's lab sessions."
     : "Your lab session attendance history.";
@@ -1702,7 +1901,37 @@ export default function Attendance() {
       </div>
 
       {isAdmin ? (
-        <AdminView />
+        <>
+          {/* Admin tab switcher */}
+          <div className="flex gap-1 bg-slate-100 rounded-lg p-1 w-fit">
+            {[
+              { key: "analytics", label: "Analytics" },
+              { key: "mark", label: "Mark Attendance" },
+              { key: "my", label: "My Attendance" },
+            ].map((tab) => (
+              <button
+                key={tab.key}
+                type="button"
+                onClick={() => setAdminTab(tab.key)}
+                className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                  adminTab === tab.key
+                    ? "bg-white text-slate-800 shadow-sm"
+                    : "text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {adminTab === "analytics" && <AdminView />}
+          {adminTab === "mark" && (
+            <LeaderView profile={profile} isAdmin={true} />
+          )}
+          {adminTab === "my" && (
+            <MemberView profile={profile} />
+          )}
+        </>
       ) : isLeader ? (
         <LeaderView profile={profile} />
       ) : (
