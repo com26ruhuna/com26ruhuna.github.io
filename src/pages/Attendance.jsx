@@ -33,13 +33,10 @@ import { useCollection } from "../hooks/useFirestore";
 import { StatusPill } from "../components/StatusPill";
 import { UserAvatar } from "../components/UserAvatar";
 
-import {
   Check,
   X,
   Loader2,
   Search,
-  ArrowUpDown,
-  ChevronDown,
 } from "lucide-react";
 
 
