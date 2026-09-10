@@ -13,7 +13,8 @@ export function useCollection(collectionName, constraints = []) {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    setLoading(true);
+    // Avoid synchronous setState in effect
+    setTimeout(() => setLoading(true), 0);
     const q = query(collection(db, collectionName), ...constraints);
     const unsub = onSnapshot(
       q,

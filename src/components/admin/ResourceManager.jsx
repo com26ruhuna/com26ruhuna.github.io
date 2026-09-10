@@ -157,10 +157,10 @@ export function ResourceManager({
     data: allGroups,
   } = useCollection("groups");
 
-  const refOptions = {
+  const refOptions = useMemo(() => ({
     users: allUsers,
     groups: allGroups,
-  };
+  }), [allUsers, allGroups]);
 
   const [
     editingId,

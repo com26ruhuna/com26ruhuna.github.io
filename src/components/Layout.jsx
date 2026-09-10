@@ -10,7 +10,6 @@ import {
   FlaskConical,
   ClipboardList,
   CheckSquare,
-  ShieldCheck,
   Settings,
   LogOut,
   Menu,

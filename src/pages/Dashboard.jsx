@@ -348,7 +348,7 @@ export default function Dashboard() {
     );
   }, [
     labs,
-    profile?.groupId,
+    profile,
   ]);
 
   /*

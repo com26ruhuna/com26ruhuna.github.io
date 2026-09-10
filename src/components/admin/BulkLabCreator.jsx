@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { addDoc, collection, doc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { useCollection } from '../../hooks/useFirestore';
@@ -23,20 +23,18 @@ export function BulkLabCreator() {
   // Per-group state
   const [selectedGroups, setSelectedGroups] = useState({});
   const [groupDates, setGroupDates] = useState({});
-  
-  // Initialize group selections when groups load
-  useEffect(() => {
-    if (groups && groups.length > 0 && Object.keys(selectedGroups).length === 0) {
-      const initialSelected = {};
-      const initialDates = {};
-      groups.forEach(g => {
-        initialSelected[g.id] = true;
-        initialDates[g.id] = '';
-      });
-      setSelectedGroups(initialSelected);
-      setGroupDates(initialDates);
-    }
-  }, [groups, selectedGroups]);
+
+  // Initialize group selections when groups load without using an effect
+  if (groups && groups.length > 0 && Object.keys(selectedGroups).length === 0) {
+    const initialSelected = {};
+    const initialDates = {};
+    groups.forEach(g => {
+      initialSelected[g.id] = true;
+      initialDates[g.id] = '';
+    });
+    setSelectedGroups(initialSelected);
+    setGroupDates(initialDates);
+  }
 
   const checkedCount = Object.values(selectedGroups).filter(Boolean).length;
   

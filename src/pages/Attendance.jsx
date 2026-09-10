@@ -33,6 +33,7 @@ import { useCollection } from "../hooks/useFirestore";
 import { StatusPill } from "../components/StatusPill";
 import { UserAvatar } from "../components/UserAvatar";
 
+import {
   Check,
   X,
   Loader2,
@@ -988,7 +989,7 @@ function LeaderView({ profile, isAdmin = false }) {
           group.name === profile.groupId
       ) || null
     );
-  }, [groups, profile?.groupId]);
+  }, [groups, profile]);
 
   // For admins: use the selected group, fallback to their own
   const activeGroupId = useMemo(() => {
@@ -1108,25 +1109,6 @@ function LeaderView({ profile, isAdmin = false }) {
 
 
   // ----------------------------------------------------------
-  // Clear invalid session
-  // ----------------------------------------------------------
-
-  useEffect(() => {
-    if (
-      sessionId &&
-      !sortedSessions.some(
-        (session) => session.id === sessionId
-      )
-    ) {
-      setSessionId("");
-      setMembers([]);
-      setMarks({});
-      setError("");
-    }
-  }, [sortedSessions, sessionId]);
-
-
-  // ----------------------------------------------------------
   // Load roster + existing attendance
   // ----------------------------------------------------------
 
@@ -1136,10 +1118,6 @@ function LeaderView({ profile, isAdmin = false }) {
       !currentGroupId ||
       !canMarkAttendance
     ) {
-      setMembers([]);
-      setMarks({});
-      setError("");
-      setLoadingMembers(false);
       return;
     }
 
